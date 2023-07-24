@@ -411,6 +411,16 @@ NTSTATUS TCPConnect
                                                 &connaddr,
                                                 RemotePort));
 
+    if ((Status != STATUS_SUCCESS) && (Status != STATUS_PENDING)) { 
+    	TI_DbgPrint(DEBUG_TCP,
+                    ("no pcb from LibTCPConnect, clear ConnectRequest.\n")); 
+    	LockObject(Connection);
+    	RemoveTailList( &Connection->ConnectRequest); 
+	    // DLB - re-check, not sure this part is correct
+	    ExFreeToNPagedLookasideList( &TdiBucketLookasideList, Bucket );
+    	UnlockObject(Connection);
+    }
+
     TI_DbgPrint(DEBUG_TCP,("[IP, TCPConnect] Leaving. Status = 0x%x\n", Status));
 
     return Status;
