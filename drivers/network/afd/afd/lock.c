@@ -214,7 +214,27 @@ PAFD_WSABUF LockBuffers( PAFD_WSABUF Buf, UINT Count,
     BOOLEAN LockFailed = FALSE;
     PAFD_MAPBUF MapBuf;
 
+    PAFD_WSABUF OurBuf; // for CORE-17526 AFD packet assembly
+    UINT DataSize = 0;  // for CORE-17526
+
     AFD_DbgPrint(MID_TRACE,("Called(%p)\n", NewBuf));
+
+    // HACK CORE-17526 use a special combination of parameters to identify a call to new buffer mode so that existing code remains intact
+    if( (LockAddress == TRUE) && (AddressBuf == (VOID *)0xFFFFFFFF) && (AddressLen == (VOID *)0xFFFFFFFF) ) 
+    { 
+    	AFD_DbgPrint(MID_TRACE,("LockBuffers: HACK starting(%p) ArrayCount %u LockAddress is TRUE AddressBuf and AddressLen are 0xFFFFFFFF.\n", Buf, Count));
+    	AFD_DbgPrint(MID_TRACE,("LockBuffers: using DataGram buffer gather mode\n"));
+    	DataSize = 0; 
+    	for( i = 0; i < Count; i++ ) 
+		    DataSize = DataSize + Buf[i].len; // tabulate size of buffer requried to assemble packet
+    } else {
+		if (LockAddress == TRUE) 
+        {
+    		AFD_DbgPrint(MID_TRACE,("LockBuffers() starting standard code for(%p) ArrayCount %u LockAddress=TRUE (magic param combo not found)\n", Buf, Count));
+		} else {
+    		AFD_DbgPrint(MID_TRACE,("LockBuffers() starting standard code for(%p) ArrayCount %u LockAddress=FALSE (magic param combo not found)\n", Buf, Count));
+		}
+    }
 
     if( NewBuf ) {
         RtlZeroMemory(NewBuf, Size);
@@ -233,54 +253,105 @@ PAFD_WSABUF LockBuffers( PAFD_WSABUF Buf, UINT Count,
                 Count += 2;
             }
         } _SEH2_EXCEPT(EXCEPTION_EXECUTE_HANDLER) {
-            AFD_DbgPrint(MIN_TRACE,("Access violation copying buffer info "
-                                    "from userland (%p %p)\n",
-                                    Buf, AddressLen));
+            AFD_DbgPrint(MIN_TRACE,( "Access violation copying buffer info from userland (%p %p)\n", Buf, AddressLen ));
             ExFreePoolWithTag(NewBuf, TAG_AFD_WSA_BUFFER);
             _SEH2_YIELD(return NULL);
         } _SEH2_END;
 
-        for( i = 0; i < Count; i++ ) {
-            AFD_DbgPrint(MID_TRACE,("Locking buffer %u (%p:%u)\n",
-                                    i, NewBuf[i].buf, NewBuf[i].len));
+	    // CORE-17526 active code starts, this hacked PAD creates a single locked MDL buffer for entire packet 
+        if( (LockAddress == TRUE) && (AddressBuf == (VOID *)0xFFFFFFFF) && (AddressLen == (VOID *)0xFFFFFFFF) ) 
+        {     /* DLB if this is true we gather the buffer pieces into a single area for the driver layer and return that */
+    	    AFD_DbgPrint(MID_TRACE,("LockBuffers: LB Hack ACTIVATED - allocating and locking single buffer to receive complete contiguous packet.\n", DataSize));
+            AFD_DbgPrint(MID_TRACE,("LockBuffers: LB Hack - Buf: %p NewBuf: %p MapBuf: %p OurBuf: %p DataSize: %u\n", Buf, NewBuf, MapBuf, OurBuf, DataSize ));
+            for( i = 0; i < Count; i++ ) 
+            { 
+	            AFD_DbgPrint(MID_TRACE,("LockBuffers: loop reached array element %u \n", i));
+                if (i == 0) 
+                {
+	                AFD_DbgPrint(MID_TRACE,("LockBuffers: calling IoAllocateMdl() for array element %u with Size %u\n", i, DataSize));
+            	    MapBuf[i].Mdl = IoAllocateMdl( NewBuf[i].buf, DataSize, FALSE, FALSE, NULL ); /* check if this routine allocates or allocates and copies, just allocates I think */
+	                if( MapBuf[i].Mdl ) 
+                    {
+	                    AFD_DbgPrint(MID_TRACE,("LockBuffers: MDL succesfully allocated, Probe and lock new MDL page %u\n", i));
+	                    _SEH2_TRY {
+        	                MmProbeAndLockPages( MapBuf[i].Mdl, LockMode, Write ? IoModifyAccess : IoReadAccess );
+                	    } 
+                        _SEH2_EXCEPT(EXCEPTION_EXECUTE_HANDLER) {
+	                        LockFailed = TRUE;
+        	            } 
+                        _SEH2_END;
+	                    if( LockFailed ) {
+            		        AFD_DbgPrint(MID_TRACE,("(LockBuffers: exception generated calling MmProbeAndLockPages(), Failed to lock page %u, cleaning up and returning NULL\n", i)); 
+	                        IoFreeMdl( MapBuf[i].Mdl );
+        	                MapBuf[i].Mdl = NULL;
+                	        ExFreePoolWithTag(NewBuf, TAG_AFD_WSA_BUFFER);
+	                        return NULL;
+        	            } else {
+        		            AFD_DbgPrint(MID_TRACE,("LockBuffers: MmProbeAndLock of MDL page %u finished.\n", i));
+                        }
+	                } else {
+        	            ExFreePoolWithTag(NewBuf, TAG_AFD_WSA_BUFFER);
+                	    AFD_DbgPrint(MID_TRACE,("LockBuffers: failed to allocate associated MDL page, returning NULL\n"));
+	                    return NULL;
+        	        }
+		        } else {
+	                AFD_DbgPrint(MID_TRACE,("LockBuffers: set MDL page %u to NULL\n", i));
+		            MapBuf[i].Mdl = NULL; /* this should make unlock skip these silently */
+                    /* continue; */
+		        }
+	            AFD_DbgPrint(MID_TRACE,("LockBuffers: loop completed array element %u \n", i));
+	        }
+	        /* DLB if we did everything correctly we now have two consolidated packet buffers, one on userland and one in MDL space. We'll pass it back to the caller, but caller needs to reset array count */
+            AFD_DbgPrint(MID_TRACE,("LockBuffers: LB Hack - loop completed, IoAllocateMdl() MapBuf[0].Mdl @ %p size: %u \n", MapBuf[0].Mdl, DataSize));
+	    } else {
+    	    AFD_DbgPrint(MID_TRACE,("LockBuffers: LB Hack INACTIVE - allocating and locking standard paired buffer set\n", DataSize));
+            
+            for( i = 0; i < Count; i++ ) {
+                AFD_DbgPrint(MID_TRACE,("Locking buffer %u (%p:%u)\n",
+                                        i, NewBuf[i].buf, NewBuf[i].len));
 
-            if( NewBuf[i].buf && NewBuf[i].len ) {
-                MapBuf[i].Mdl = IoAllocateMdl( NewBuf[i].buf,
-                                               NewBuf[i].len,
-                                               FALSE,
-                                               FALSE,
-                                               NULL );
-            } else {
-                MapBuf[i].Mdl = NULL;
-                continue;
-            }
-
-            AFD_DbgPrint(MID_TRACE,("NewMdl @ %p\n", MapBuf[i].Mdl));
-
-            if( MapBuf[i].Mdl ) {
-                AFD_DbgPrint(MID_TRACE,("Probe and lock pages\n"));
-                _SEH2_TRY {
-                    MmProbeAndLockPages( MapBuf[i].Mdl, LockMode,
-                                         Write ? IoModifyAccess : IoReadAccess );
-                } _SEH2_EXCEPT(EXCEPTION_EXECUTE_HANDLER) {
-                    LockFailed = TRUE;
-                } _SEH2_END;
-                AFD_DbgPrint(MID_TRACE,("MmProbeAndLock finished\n"));
-
-                if( LockFailed ) {
-            AFD_DbgPrint(MIN_TRACE,("Failed to lock pages\n"));
-                    IoFreeMdl( MapBuf[i].Mdl );
+                if( NewBuf[i].buf && NewBuf[i].len ) {
+                    MapBuf[i].Mdl = IoAllocateMdl( NewBuf[i].buf,
+                                                   NewBuf[i].len,
+                                                   FALSE,
+                                                   FALSE,
+                                                   NULL );
+                } else {
                     MapBuf[i].Mdl = NULL;
+                    continue;
+                }
+
+                AFD_DbgPrint(MID_TRACE,("NewMdl @ %p\n", MapBuf[i].Mdl));
+
+                if( MapBuf[i].Mdl ) {
+                    AFD_DbgPrint(MID_TRACE,("Probe and lock pages\n"));
+                    _SEH2_TRY {
+                        MmProbeAndLockPages( MapBuf[i].Mdl, LockMode,
+                                             Write ? IoModifyAccess : IoReadAccess );
+                    } _SEH2_EXCEPT(EXCEPTION_EXECUTE_HANDLER) {
+                        LockFailed = TRUE;
+                    } _SEH2_END;
+                    AFD_DbgPrint(MID_TRACE,("MmProbeAndLock finished\n"));
+                    
+                    if( LockFailed ) {
+                        AFD_DbgPrint(MIN_TRACE,("Failed to lock pages\n"));
+                        IoFreeMdl( MapBuf[i].Mdl );
+                        MapBuf[i].Mdl = NULL;
+                        ExFreePoolWithTag(NewBuf, TAG_AFD_WSA_BUFFER);
+                        return NULL;
+                    }
+                } else {
                     ExFreePoolWithTag(NewBuf, TAG_AFD_WSA_BUFFER);
                     return NULL;
                 }
-            } else {
-                ExFreePoolWithTag(NewBuf, TAG_AFD_WSA_BUFFER);
-                return NULL;
             }
         }
-    }
 
+    } else {
+        AFD_DbgPrint(MID_TRACE,("LockBuffers: pool allocation for structure failed, returning NULL\n"));
+	    return NULL;
+    }
+    AFD_DbgPrint(MID_TRACE,("LockBuffers: completed succesfully NewBuf prepared at - %p for buffer %p\n", NewBuf, Buf));    
     AFD_DbgPrint(MID_TRACE,("Leaving %p\n", NewBuf));
 
     return NewBuf;
