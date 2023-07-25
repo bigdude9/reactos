@@ -1144,12 +1144,24 @@ CleanupPendingIrp(PAFD_FCB FCB, PIRP Irp, PIO_STACK_LOCATION IrpSp, PAFD_ACTIVE_
     if (IrpSp->MajorFunction == IRP_MJ_READ)
     {
         RecvReq = GetLockedData(Irp, IrpSp);
-        UnlockBuffers(RecvReq->BufferArray, RecvReq->BufferCount, CheckUnlockExtraBuffers(FCB, IrpSp));
+	    if (CheckUnlockExtraBuffers(FCB, IrpSp)) {
+    		AFD_DbgPrint(MIN_TRACE,("CleanupPendingIrp: IRP_MJ_READ calling UnlockBuffers(RecvReq->BufferArray, RecvReq->BufferCount, TRUE) - CheckUnlockExtraBuffers(FCB, IrpSp)) = TRUE.\n"));
+        	UnlockBuffers(RecvReq->BufferArray, RecvReq->BufferCount, TRUE);
+        } else {
+    		AFD_DbgPrint(MIN_TRACE,("CleanupPendingIrp: IRP_MJ_READ calling UnlockBuffers(RecvReq->BufferArray, RecvReq->BufferCount, FALSE) - CheckUnlockExtraBuffers(FCB, IrpSp)) = FALSE.\n"));
+        	UnlockBuffers(RecvReq->BufferArray, RecvReq->BufferCount, FALSE);
+        }
     }
     else if (IrpSp->MajorFunction == IRP_MJ_WRITE)
     {
         SendReq = GetLockedData(Irp, IrpSp);
-        UnlockBuffers(SendReq->BufferArray, SendReq->BufferCount, CheckUnlockExtraBuffers(FCB, IrpSp));
+	    if (CheckUnlockExtraBuffers(FCB, IrpSp)) {
+    		AFD_DbgPrint(MIN_TRACE,("CleanupPendingIrp: IRP_MJ_WRITE calling UnlockBuffers(RecvReq->BufferArray, RecvReq->BufferCount, TRUE) - CheckUnlockExtraBuffers(FCB, IrpSp)) = TRUE.\n"));
+        	UnlockBuffers(RecvReq->BufferArray, RecvReq->BufferCount, TRUE);
+        } else {
+    		AFD_DbgPrint(MIN_TRACE,("CleanupPendingIrp: IRP_MJ_WRITE calling UnlockBuffers(RecvReq->BufferArray, RecvReq->BufferCount, FALSE) - CheckUnlockExtraBuffers(FCB, IrpSp)) = FALSE.\n"));
+        	UnlockBuffers(RecvReq->BufferArray, RecvReq->BufferCount, FALSE);
+        }
     }
     else
     {
@@ -1158,12 +1170,24 @@ CleanupPendingIrp(PAFD_FCB FCB, PIRP Irp, PIO_STACK_LOCATION IrpSp, PAFD_ACTIVE_
         if (IrpSp->Parameters.DeviceIoControl.IoControlCode == IOCTL_AFD_RECV)
         {
             RecvReq = GetLockedData(Irp, IrpSp);
-            UnlockBuffers(RecvReq->BufferArray, RecvReq->BufferCount, CheckUnlockExtraBuffers(FCB, IrpSp));
+	        if (CheckUnlockExtraBuffers(FCB, IrpSp)) {
+    		    AFD_DbgPrint(MIN_TRACE,("CleanupPendingIrp: IRP_MJ_DEVICE_CONTROL IOCTL_AFD_RECV calling UnlockBuffers(RecvReq->BufferArray, RecvReq->BufferCount, TRUE) - CheckUnlockExtraBuffers(FCB, IrpSp)) = TRUE.\n"));
+        	    UnlockBuffers(RecvReq->BufferArray, RecvReq->BufferCount, TRUE);
+            } else {
+    		    AFD_DbgPrint(MIN_TRACE,("CleanupPendingIrp: IRP_MJ_DEVICE_CONTROL IOCTL_AFD_RECV calling UnlockBuffers(RecvReq->BufferArray, RecvReq->BufferCount, TRUE) - CheckUnlockExtraBuffers(FCB, IrpSp)) = FALSE.\n"));
+        	    UnlockBuffers(RecvReq->BufferArray, RecvReq->BufferCount, FALSE);
+            }
         }
         else if (IrpSp->Parameters.DeviceIoControl.IoControlCode == IOCTL_AFD_SEND)
         {
             SendReq = GetLockedData(Irp, IrpSp);
-            UnlockBuffers(SendReq->BufferArray, SendReq->BufferCount, CheckUnlockExtraBuffers(FCB, IrpSp));
+	        if (CheckUnlockExtraBuffers(FCB, IrpSp)) {
+    		    AFD_DbgPrint(MIN_TRACE,("CleanupPendingIrp: IRP_MJ_DEVICE_CONTROL IOCTL_AFD_SEND calling UnlockBuffers(RecvReq->BufferArray, RecvReq->BufferCount, TRUE) - CheckUnlockExtraBuffers(FCB, IrpSp)) = TRUE.\n"));
+        	    UnlockBuffers(RecvReq->BufferArray, RecvReq->BufferCount, TRUE);
+            } else {
+    		    AFD_DbgPrint(MIN_TRACE,("CleanupPendingIrp: IRP_MJ_DEVICE_CONTROL IOCTL_AFD_SEND calling UnlockBuffers(RecvReq->BufferArray, RecvReq->BufferCount, TRUE) - CheckUnlockExtraBuffers(FCB, IrpSp)) = FALSE.\n"));
+        	    UnlockBuffers(RecvReq->BufferArray, RecvReq->BufferCount, FALSE);
+            }
         }
         else if (IrpSp->Parameters.DeviceIoControl.IoControlCode == IOCTL_AFD_SELECT)
         {
