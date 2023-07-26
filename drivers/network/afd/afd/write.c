@@ -364,7 +364,7 @@ AfdConnectedSocketWriteData(PDEVICE_OBJECT DeviceObject, PIRP Irp,
 
 	    /* LockBuffers replaces array with a single buffer, so preserve length for later use */
         if (SendReq->BufferCount > 1) {
-	        AFD_DbgPrint(MIN_TRACE,("AfdConnectedSocketWriteData: PAD Hack - Assembling local packet buffer from %u Buffer Array elements, clearing buffer.\n", SendReq->BufferCount));
+	        AFD_DbgPrint(MID_TRACE,("AfdConnectedSocketWriteData: PAD Hack - Assembling local packet buffer from %u Buffer Array elements, clearing buffer\n", SendReq->BufferCount));
         	RtlZeroMemory((&pktbuf[0]), 4096 );
         	/* save the data length for cross checking later */
     	    FullSendLen = 0;
@@ -378,22 +378,18 @@ AfdConnectedSocketWriteData(PDEVICE_OBJECT DeviceObject, PIRP Irp,
 	    	    } _SEH2_END;
         		FullSendLen = FullSendLen + SendReq->BufferArray[LoopIdx].len; 
     	    }
-	        AFD_DbgPrint(MIN_TRACE,("AfdConnectedSocketWriteData: PAD Hack - Completed local buffer assembled.\n"));
-    	    AFD_DbgPrint(MIN_TRACE,("AfdConnectedSocketWriteData: PAD-LB Hack - calling LockBuffers() with LockAddress=TRUE and (VOID *)0xFFFFFFFF Lock entry address and length - 0x%p:u\n", &pktbuf[0], FullSendLen));
-    	    AFD_DbgPrint(MIN_TRACE,("AfdConnectedSocketWriteData: prior to LockBuffers() call Data length is %u.\n", FullSendLen));
+    	    AFD_DbgPrint(MID_TRACE,("AfdConnectedSocketWriteData: local PAD buffer ready, Data length is %u\n", FullSendLen));
         } else {
-	        AFD_DbgPrint(MIN_TRACE,("AfdConnectedSocketWriteData: calling LockBuffers() without hacks LockAddress=FALSE and NULL Lock entry address and length - 0x%p:%u\n", SendReq->BufferArray[0].buf, SendReq->BufferArray[0].len));
-        	AFD_DbgPrint(MIN_TRACE,("AfdConnectedSocketWriteData: prior to LockBuffers() call Data length is %u.\n",SendReq->BufferArray[0].len));
+        	AFD_DbgPrint(MID_TRACE,("AfdConnectedSocketWriteData: prior to LockBuffers() call Data length is %u\n",SendReq->BufferArray[0].len));
         }
-    	AFD_DbgPrint(MIN_TRACE,("AfdConnectedSocketWriteData: prior to LockBuffers() Data length is %u.\n", FullSendLen));
 
         /* Must lock buffers before handing off user data */
         if (SendReq->BufferCount > 1) {
-        	AFD_DbgPrint(MIN_TRACE,("AfdConnectedSocketWriteData: LB Hack - multiple buffers in array, performing LockBuffers() gather mode - 0x%p\n", SendReq->BufferArray));
-	        SendReq->BufferArray = LockBuffers( SendReq->BufferArray, SendReq->BufferCount, (VOID *)0xFFFFFFFF, (VOID *)0xFFFFFFFF, FALSE, TRUE, LockMode );
+        	AFD_DbgPrint(MID_TRACE,("AfdConnectedSocketWriteData: LB Hack - multiple buffers in array, performing LockBuffers() gather mode - 0x%p\n", SendReq->BufferArray));
+	        SendReq->BufferArray = LockBuffers(SendReq->BufferArray, SendReq->BufferCount, (VOID *)0xFFFFFFFF, (VOID *)0xFFFFFFFF, FALSE, TRUE, LockMode);
 	        /* SendReq->BufferCount = 1; // as a precaution keep the structures valid */            
         } else {
-    	    AFD_DbgPrint(MIN_TRACE,("AfdConnectedSocketWriteData: LB Hack - SINGLE buffer in array, calling original LockBuffers() code - 0x%p\n", SendReq->BufferArray));
+    	    AFD_DbgPrint(MID_TRACE,("AfdConnectedSocketWriteData: LB Hack - SINGLE buffer in array, calling original LockBuffers() code - 0x%p\n", SendReq->BufferArray));
 	        SendReq->BufferArray = LockBuffers( SendReq->BufferArray, SendReq->BufferCount, NULL, NULL, FALSE, FALSE, LockMode );
         }
 
@@ -477,7 +473,7 @@ AfdConnectedSocketWriteData(PDEVICE_OBJECT DeviceObject, PIRP Irp,
                                        Irp, 0 );
     }
 
-    AFD_DbgPrint(MID_TRACE,("Socket state %u\n", FCB->State));
+    AFD_DbgPrint(MIN_TRACE,("Socket state %u\n", FCB->State));
 
     if( FCB->State != SOCKET_STATE_CONNECTED ) {
         AFD_DbgPrint(MID_TRACE,("Socket not connected\n"));
@@ -648,10 +644,10 @@ AfdPacketSocketWriteData(PDEVICE_OBJECT DeviceObject, PIRP Irp,
             ( FCB, STATUS_NO_MEMORY, Irp, 0 );
     	}
     } else
-        AFD_DbgPrint(MIN_TRACE,("AfdPacketSocketWriteData: FCB->State <> SOCKET_STATE_CREATED, local bind skipped and FCB->State unchanged.\n"));
+        AFD_DbgPrint(MID_TRACE,("AfdPacketSocketWriteData: FCB->State <> SOCKET_STATE_CREATED, local bind skipped and FCB->State unchanged\n"));
     
     if (SendReq->BufferCount > 1) {
-	    AFD_DbgPrint(MIN_TRACE,("AfdPacketSocketWriteData: PAD Hack - Assembling local packet buffer from %u Buffer Array elements, clearing buffer.\n", SendReq->BufferCount));
+	    AFD_DbgPrint(MID_TRACE,("AfdPacketSocketWriteData: PAD Hack - Assembling local packet buffer from %u Buffer Array elements, clearing buffer\n", SendReq->BufferCount));
     	RtlZeroMemory((&pktbuf[0]), 4096 );
     	/* save the data length for cross checking later */
     	FullSendLen = 0;
@@ -665,65 +661,60 @@ AfdPacketSocketWriteData(PDEVICE_OBJECT DeviceObject, PIRP Irp,
 		    } _SEH2_END;
     		FullSendLen = FullSendLen + SendReq->BufferArray[LoopIdx].len; 
     	}
-	    AFD_DbgPrint(MIN_TRACE,("AfdPacketSocketWriteData: PAD Hack - Completed local buffer assembled.\n"));
-	    AFD_DbgPrint(MIN_TRACE,("AfdPacketSocketWriteData: PAD-LB Hack - calling LockBuffers() with LockAddress=TRUE and (VOID *)0xFFFFFFFF Lock entry address and length - 0x%p:u\n", &pktbuf[0], FullSendLen));
-    	AFD_DbgPrint(MIN_TRACE,("AfdPacketSocketWriteData: prior to LockBuffers() call Data length is %u.\n", FullSendLen));
+    	AFD_DbgPrint(MID_TRACE,("AfdPacketSocketWriteData: local buffer ready, Data length is %u\n", FullSendLen));
     } else {
-	    AFD_DbgPrint(MIN_TRACE,("AfdPacketSocketWriteData: calling LockBuffers() without hacks LockAddress=FALSE and NULL Lock entry address and length - 0x%p:%u\n", SendReq->BufferArray[0].buf, SendReq->BufferArray[0].len));
-    	AFD_DbgPrint(MIN_TRACE,("AfdPacketSocketWriteData: prior to LockBuffers() call Data length is %u.\n",SendReq->BufferArray[0].len));
+    	AFD_DbgPrint(MID_TRACE,("AfdPacketSocketWriteData: prior to LockBuffers() call Data length is %u\n",SendReq->BufferArray[0].len));
     }
 
     if (SendReq->BufferCount > 1) {
-    	AFD_DbgPrint(MIN_TRACE,("AfdPacketSocketWriteData: LB Hack - multiple buffers in array, performing LockBuffers() gather mode - 0x%p\n", SendReq->BufferArray));
+    	AFD_DbgPrint(MID_TRACE,("AfdPacketSocketWriteData: LB Hack - multiple buffers in array, performing LockBuffers() gather mode - 0x%p\n", SendReq->BufferArray));
 	    SendReq->BufferArray = LockBuffers( SendReq->BufferArray, SendReq->BufferCount, (VOID *)0xFFFFFFFF, (VOID *)0xFFFFFFFF, FALSE, TRUE, LockMode );
 	    /* SendReq->BufferCount = 1; // as a precaution keep the structures valid */
     } else {
-    	AFD_DbgPrint(MIN_TRACE,("AfdPacketSocketWriteData: LB Hack - SINGLE buffer in array, calling original LockBuffers() code - 0x%p\n", SendReq->BufferArray));
+    	AFD_DbgPrint(MID_TRACE,("AfdPacketSocketWriteData: LB Hack - SINGLE buffer in array, calling original LockBuffers() code - 0x%p\n", SendReq->BufferArray));
 	    SendReq->BufferArray = LockBuffers( SendReq->BufferArray, SendReq->BufferCount, NULL, NULL, FALSE, FALSE, LockMode );
     }
 
     if( !SendReq->BufferArray ) {
-    	AFD_DbgPrint(MIN_TRACE,("AfdPacketSocketWriteData: failed call to LockBuffers(), return via UnlockAndMaybecomplete() as STATUS_ACCESS_VIOLATION.\n"));
+    	AFD_DbgPrint(MID_TRACE,("AfdPacketSocketWriteData: failed call to LockBuffers(), return via UnlockAndMaybecomplete() as STATUS_ACCESS_VIOLATION\n"));
         return UnlockAndMaybeComplete( FCB, STATUS_ACCESS_VIOLATION, Irp, 0 );
     }
 
     if (SendReq->BufferCount > 1) {
-    	AFD_DbgPrint(MIN_TRACE,("Buffer count is > 1 \n"));
+    	AFD_DbgPrint(MID_TRACE,("Buffer count is > 1 \n"));
     } else {
-    	AFD_DbgPrint(MIN_TRACE,("Single Buffer\n"));
+    	AFD_DbgPrint(MID_TRACE,("Single Buffer\n"));
     } 
     
     AFD_DbgPrint
-        (MIN_TRACE,("AfdPacketSocketWriteData: RemoteAddress #%d Type %u\n",
+        (MID_TRACE,("AfdPacketSocketWriteData: RemoteAddress #%d Type %u\n",
                     ((PTRANSPORT_ADDRESS)SendReq->TdiConnection.RemoteAddress)->TAAddressCount,
                     ((PTRANSPORT_ADDRESS)SendReq->TdiConnection.RemoteAddress)->Address[0].AddressType));
 
     AFD_DbgPrint
-        (MIN_TRACE,("AfdPacketSocketWriteData: SendReq->TdiConnection.RemoteAddress #%d Type: %x Address: %lx Port: %x\n", 
+        (MID_TRACE,("AfdPacketSocketWriteData: SendReq->TdiConnection.RemoteAddress #%d Type: %x Address: %lx Port: %x\n", 
             ((PTRANSPORT_ADDRESS)SendReq->TdiConnection.RemoteAddress)->TAAddressCount,
             ((PTRANSPORT_ADDRESS)SendReq->TdiConnection.RemoteAddress)->Address[0].AddressType, // word
 		    ((PTRANSPORT_ADDRESS)SendReq->TdiConnection.RemoteAddress)->Address[0].Address      // dword
 		    //, ((PTRANSPORT_ADDRESS)SendReq->TdiConnection.RemoteAddress)->Address[0].Port 		
 		    ));
 
-    AFD_DbgPrint(MIN_TRACE,("AfdPacketSocketWriteData: Calling TdiBuildConnectionInfo() setting TargetAddress from SendReq->TdiConnection.RemoteAddress.\n"));
-
+    AFD_DbgPrint(MID_TRACE,("AfdPacketSocketWriteData: Calling TdiBuildConnectionInfo() setting TargetAddress from SendReq->TdiConnection.RemoteAddress\n"));
     Status = TdiBuildConnectionInfo( &TargetAddress, ((PTRANSPORT_ADDRESS)SendReq->TdiConnection.RemoteAddress) );
 
-    /* DLB hack, if the above operation failed we assume the remote address is not provided and check if we have connection information in the FCB to use */
+    /* if the above operation failed target address was not provided, check if we have connection information in the FCB we can use */
     if( !NT_SUCCESS(Status) ) {
 	    if (FCB->ConnectCallInfo) {
-    	    AFD_DbgPrint(MIN_TRACE,("AfdPacketSocketWriteData: setting TargetAddress from ConnectCallInfo->RemoteAddress.\n"));
+    	    AFD_DbgPrint(MID_TRACE,("AfdPacketSocketWriteData: setting TargetAddress from ConnectCallInfo->RemoteAddress\n"));
 		    Status = TdiBuildConnectionInfo( &TargetAddress, ((PTRANSPORT_ADDRESS)FCB->ConnectCallInfo->RemoteAddress) );
 	    } else {
 		    if (FCB->ConnectReturnInfo) {
-    		    AFD_DbgPrint(MIN_TRACE,("AfdPacketSocketWriteData: HACK2 settings TargetAddress from ConnectReturnInfo->RemoteAddress.\n"));
+    		    AFD_DbgPrint(MID_TRACE,("AfdPacketSocketWriteData: HACK2 settings TargetAddress from ConnectReturnInfo->RemoteAddress\n"));
 			    Status = TdiBuildConnectionInfo( &TargetAddress, ((PTRANSPORT_ADDRESS)FCB->ConnectReturnInfo->RemoteAddress) );
 		    }
 	    }
     }
-
-    AFD_DbgPrint(MIN_TRACE,("AfdPacketSocketWriteData: HACKs completed, send continuing.\n"));
+    AFD_DbgPrint(MID_TRACE,("AfdPacketSocketWriteData: HACKs completed, send continuing\n"));
        
     /* Check the size of the Address given ... */
 
