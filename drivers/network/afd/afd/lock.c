@@ -230,9 +230,9 @@ PAFD_WSABUF LockBuffers( PAFD_WSABUF Buf, UINT Count,
     } else {
 		if (LockAddress == TRUE) 
         {
-    		AFD_DbgPrint(MID_TRACE,("LockBuffers() starting standard code for(%p) ArrayCount %u LockAddress=TRUE (magic param combo not found)\n", Buf, Count));
+    		AFD_DbgPrint(MID_TRACE,("LockBuffers: starting standard code for(%p) ArrayCount %u LockAddress=TRUE (magic param combo not found)\n", Buf, Count));
 		} else {
-    		AFD_DbgPrint(MID_TRACE,("LockBuffers() starting standard code for(%p) ArrayCount %u LockAddress=FALSE (magic param combo not found)\n", Buf, Count));
+    		AFD_DbgPrint(MID_TRACE,("LockBuffers: starting standard code for(%p) ArrayCount %u LockAddress=FALSE (magic param combo not found)\n", Buf, Count));
 		}
     }
 
@@ -261,11 +261,11 @@ PAFD_WSABUF LockBuffers( PAFD_WSABUF Buf, UINT Count,
 	    // CORE-17526 active code starts, this hacked PAD creates a single locked MDL buffer for entire packet 
         if( (LockAddress == TRUE) && (AddressBuf == (VOID *)0xFFFFFFFF) && (AddressLen == (VOID *)0xFFFFFFFF) ) 
         {     /* DLB if this is true we gather the buffer pieces into a single area for the driver layer and return that */
-    	    AFD_DbgPrint(MID_TRACE,("LockBuffers: LB Hack ACTIVATED - allocating and locking single buffer to receive complete contiguous packet.\n", DataSize));
-            AFD_DbgPrint(MID_TRACE,("LockBuffers: LB Hack - Buf: %p NewBuf: %p MapBuf: %p OurBuf: %p DataSize: %u\n", Buf, NewBuf, MapBuf, OurBuf, DataSize ));
+    	    AFD_DbgPrint(MID_TRACE,("LockBuffers: LB gather mode - allocating and locking single buffer to receive complete contiguous packet\n", DataSize));
+            AFD_DbgPrint(MID_TRACE,("LockBuffers: Buf: %p NewBuf: %p MapBuf: %p OurBuf: %p DataSize: %u\n", Buf, NewBuf, MapBuf, OurBuf, DataSize ));
             for( i = 0; i < Count; i++ ) 
             { 
-	            AFD_DbgPrint(MID_TRACE,("LockBuffers: loop reached array element %u \n", i));
+	            AFD_DbgPrint(MID_TRACE,("LockBuffers: loop reached array element %u\n", i));
                 if (i == 0) 
                 {
 	                AFD_DbgPrint(MID_TRACE,("LockBuffers: calling IoAllocateMdl() for array element %u with Size %u\n", i, DataSize));
@@ -287,7 +287,7 @@ PAFD_WSABUF LockBuffers( PAFD_WSABUF Buf, UINT Count,
                 	        ExFreePoolWithTag(NewBuf, TAG_AFD_WSA_BUFFER);
 	                        return NULL;
         	            } else {
-        		            AFD_DbgPrint(MID_TRACE,("LockBuffers: MmProbeAndLock of MDL page %u finished.\n", i));
+        		            AFD_DbgPrint(MID_TRACE,("LockBuffers: MmProbeAndLock of MDL page %u finished\n", i));
                         }
 	                } else {
         	            ExFreePoolWithTag(NewBuf, TAG_AFD_WSA_BUFFER);
@@ -302,9 +302,9 @@ PAFD_WSABUF LockBuffers( PAFD_WSABUF Buf, UINT Count,
 	            AFD_DbgPrint(MID_TRACE,("LockBuffers: loop completed array element %u \n", i));
 	        }
 	        /* DLB if we did everything correctly we now have two consolidated packet buffers, one on userland and one in MDL space. We'll pass it back to the caller, but caller needs to reset array count */
-            AFD_DbgPrint(MID_TRACE,("LockBuffers: LB Hack - loop completed, IoAllocateMdl() MapBuf[0].Mdl @ %p size: %u \n", MapBuf[0].Mdl, DataSize));
+            AFD_DbgPrint(MID_TRACE,("LockBuffers: gather mode loop completed, IoAllocateMdl() MapBuf[0].Mdl @ %p size: %u\n", MapBuf[0].Mdl, DataSize));
 	    } else {
-    	    AFD_DbgPrint(MID_TRACE,("LockBuffers: LB Hack INACTIVE - allocating and locking standard paired buffer set\n", DataSize));
+    	    AFD_DbgPrint(MID_TRACE,("LockBuffers: gather mode INACTIVE - allocating and locking standard paired buffer set\n", DataSize));
             
             for( i = 0; i < Count; i++ ) {
                 AFD_DbgPrint(MID_TRACE,("Locking buffer %u (%p:%u)\n",
