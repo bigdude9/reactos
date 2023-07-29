@@ -362,7 +362,6 @@ AfdConnectedSocketWriteData(PDEVICE_OBJECT DeviceObject, PIRP Irp,
         if( !(SendReq = LockRequest( Irp, IrpSp, FALSE, &LockMode )) )
             return UnlockAndMaybeComplete( FCB, STATUS_NO_MEMORY, Irp, 0 );
 
-        /* LockBuffers replaces array with a single buffer, so preserve length for later use */
         if (SendReq->BufferCount > 1) {
             AFD_DbgPrint(MID_TRACE,("AfdConnectedSocketWriteData: PAD Hack - Assembling local packet buffer from %u Buffer Array elements, clearing buffer\n", SendReq->BufferCount));
             RtlZeroMemory((&pktbuf[0]), 4096 );
@@ -391,11 +390,11 @@ AfdConnectedSocketWriteData(PDEVICE_OBJECT DeviceObject, PIRP Irp,
             SendReq->BufferArray = LockBuffers(SendReq->BufferArray, SendReq->BufferCount, (VOID *)0xFFFFFFFF, (VOID *)0xFFFFFFFF, FALSE, TRUE, LockMode);
             // SendReq->BufferCount = 1; // as a precaution keep the structures valid
         } else {
-*/
         if (SendReq->BufferCount == 1) {
             AFD_DbgPrint(MID_TRACE,("AfdConnectedSocketWriteData: LB Hack - SINGLE buffer in array, calling original LockBuffers() code - 0x%p\n", SendReq->BufferArray));
+*/
             SendReq->BufferArray = LockBuffers( SendReq->BufferArray, SendReq->BufferCount, NULL, NULL, FALSE, FALSE, LockMode );
-        }
+//        }
 
         if( !SendReq->BufferArray ) {
             return UnlockAndMaybeComplete( FCB, STATUS_ACCESS_VIOLATION,
@@ -670,17 +669,15 @@ AfdPacketSocketWriteData(PDEVICE_OBJECT DeviceObject, PIRP Irp,
         AFD_DbgPrint(MID_TRACE,("AfdPacketSocketWriteData: prior to LockBuffers() call Data length is %u\n",SendReq->BufferArray[0].len));
     }
 /*
-// don't need to lock buffers, using our copy to send
     if (SendReq->BufferCount > 1) {
         AFD_DbgPrint(MID_TRACE,("AfdPacketSocketWriteData: LB Hack - multiple buffers in array, performing LockBuffers() gather mode - 0x%p\n", SendReq->BufferArray));
         SendReq->BufferArray = LockBuffers( SendReq->BufferArray, SendReq->BufferCount, (VOID *)0xFFFFFFFF, (VOID *)0xFFFFFFFF, FALSE, TRUE, LockMode );
         // SendReq->BufferCount = 1; // as a precaution keep the structures valid
     } else {
-*/
-    if (SendReq->BufferCount == 1) {
         AFD_DbgPrint(MID_TRACE,("AfdPacketSocketWriteData: LB Hack - SINGLE buffer in array, calling original LockBuffers() code - 0x%p\n", SendReq->BufferArray));
+*/
         SendReq->BufferArray = LockBuffers( SendReq->BufferArray, SendReq->BufferCount, NULL, NULL, FALSE, FALSE, LockMode );
-    }
+//    }
 
     if( !SendReq->BufferArray ) {
         AFD_DbgPrint(MID_TRACE,("AfdPacketSocketWriteData: failed call to LockBuffers(), return via UnlockAndMaybecomplete() as STATUS_ACCESS_VIOLATION\n"));
